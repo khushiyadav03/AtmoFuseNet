@@ -54,3 +54,13 @@ data/Beijing Data/
 # OS files
 .DS_Store
 Thumbs.db
+
+# TeX / LaTeX build artifacts and compilers
+paper/tectonic.exe
+*.aux
+*.bbl
+*.blg
+*.out
+*.toc
+*.synctex.gz
+

@@ -8,12 +8,12 @@ import pandas as pd
 import torch
 
 from utils import *
-from airphynet_model import AirPhyNetModel
+from atmofusenet_model import AtmoFuseNetModel
 from metrics import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class AirPhyNetSupervisor:
+class AtmoFuseNetSupervisor:
     def __init__(self, adj_mx, edge_index, edge_attr, **kwargs):
         self._kwargs = kwargs
         self._data_kwargs = kwargs.get('data')
@@ -40,8 +40,8 @@ class AirPhyNetSupervisor:
         self.output_dim = int(self._model_kwargs.get('output_dim', 1))
 
         # setup model
-        pgdenet_model = AirPhyNetModel(adj_mx, edge_index, edge_attr, self._logger, **self._model_kwargs)
-        self.pgdenet_model = pgdenet_model.cuda() if torch.cuda.is_available() else pgdenet_model
+        atmofusenet_model = AtmoFuseNetModel(adj_mx, edge_index, edge_attr, self._logger, **self._model_kwargs)
+        self.atmofusenet_model = atmofusenet_model.cuda() if torch.cuda.is_available() else atmofusenet_model
         self._logger.info("Model created")
 
         self._epoch_num = self._train_kwargs.get('epoch', 0)
@@ -69,7 +69,7 @@ class AirPhyNetSupervisor:
             else:
                 filter_type_abbr = 'Default'
             
-            run_id = 'airphynet_%s_h_%d_lr_%g_bs_%d_%s/' % (filter_type_abbr, horizon, learning_rate, batch_size,time.strftime('%m%d%H%M%S'))
+            run_id = 'atmofusenet_%s_h_%d_lr_%g_bs_%d_%s/' % (filter_type_abbr, horizon, learning_rate, batch_size,time.strftime('%m%d%H%M%S'))
             base_dir = kwargs.get('base_dir')
             log_dir = os.path.join(base_dir, run_id)
         if not os.path.exists(log_dir):
@@ -81,7 +81,7 @@ class AirPhyNetSupervisor:
         if not os.path.exists(model_path):
             os.makedirs(model_path)
         config = dict(self._kwargs)
-        config['model_state_dict'] = self.pgdenet_model.state_dict()
+        config['model_state_dict'] = self.atmofusenet_model.state_dict()
         config['epoch'] = epoch
         torch.save(config, os.path.join(model_path,'epo%d.tar') % epoch)
         self._logger.info("Saved model at {}".format(epoch))
@@ -91,18 +91,18 @@ class AirPhyNetSupervisor:
         self._setup_graph()
         assert os.path.exists('models/epo%d.tar' % self._epoch_num), 'Weights at epoch %d not found' % self._epoch_num
         checkpoint = torch.load('models/epo%d.tar' % self._epoch_num, map_location='cpu')
-        self.pgdenet_model.load_state_dict(checkpoint['model_state_dict'])
+        self.atmofusenet_model.load_state_dict(checkpoint['model_state_dict'])
         self._logger.info("Loaded model at {}".format(self._epoch_num))
 
     def _setup_graph(self):
         with torch.no_grad():
-            self.pgdenet_model.eval()
+            self.atmofusenet_model.eval()
 
             val_iterator = self._data['val_loader'].get_iterator()
 
             for _, (x, y) in enumerate(val_iterator):
                 x, y = self._prepare_data(x, y)
-                output = self.pgdenet_model(x)
+                output = self.atmofusenet_model(x)
                 break
 
     def train(self, **kwargs):
@@ -115,7 +115,7 @@ class AirPhyNetSupervisor:
 
         min_val_loss = float('inf')
         wait = 0
-        optimizer = torch.optim.Adam(self.pgdenet_model.parameters(), lr = base_lr, eps = epsilon)
+        optimizer = torch.optim.Adam(self.atmofusenet_model.parameters(), lr = base_lr, eps = epsilon)
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=steps,
                                                             gamma=lr_decay_ratio)
 
@@ -130,7 +130,7 @@ class AirPhyNetSupervisor:
 
         for epoch_num in range(self._epoch_num, epochs):
             print('\nTrain epoch %s:' % (epoch_num))
-            self.pgdenet_model.train()
+            self.atmofusenet_model.train()
 
             train_iterator = self._data['train_loader'].get_iterator()
             losses = []
@@ -144,11 +144,11 @@ class AirPhyNetSupervisor:
                 optimizer.zero_grad()
 
                 x, y = self._prepare_data(x, y)
-                output, fe = self.pgdenet_model(x, y, batches_seen)
+                output, fe = self.atmofusenet_model(x, y, batches_seen)
 
                 if batches_seen == 0:
                     # this is a workaround to accommodate dynamically registered parameters
-                    optimizer = torch.optim.Adam(self.pgdenet_model.parameters(), lr=base_lr, eps=epsilon)
+                    optimizer = torch.optim.Adam(self.atmofusenet_model.parameters(), lr=base_lr, eps=epsilon)
 
                 loss = self._compute_loss(y, output)
                 self._logger.debug("FE: number - {}, time - {:.3f} s, err - {:.3f}".format(*fe, loss.item()))
@@ -270,7 +270,7 @@ class AirPhyNetSupervisor:
         :return: mean L1Loss
         """
         with torch.no_grad():
-            self.pgdenet_model.eval()
+            self.atmofusenet_model.eval()
 
             val_iterator = self._data['{}_loader'.format(dataset)].get_iterator()
             mae_losses = []
@@ -285,7 +285,7 @@ class AirPhyNetSupervisor:
             for _, (x, y) in enumerate(val_iterator):
                 x, y = self._prepare_data(x, y)
 
-                output, fe = self.pgdenet_model(x)
+                output, fe = self.atmofusenet_model(x)
                 mae, mape, rmse = self._compute_loss_eval(y, output)
                 mae_losses.append(mae)
                 mape_losses.append(mape)
@@ -336,7 +336,7 @@ class AirPhyNetSupervisor:
         :return: mean L1Loss
         """
         with torch.no_grad():
-            self.pgdenet_model= self.pgdenet_model.eval()
+            self.atmofusenet_model= self.atmofusenet_model.eval()
 
             val_iterator = self._data['{}_loader'.format(dataset)].get_iterator()
             losses = []
@@ -350,7 +350,7 @@ class AirPhyNetSupervisor:
 
             for _, (x, y) in enumerate(val_iterator):
                 x, y = self._prepare_data(x, y)
-                output, fe = self.pgdenet_model(x)
+                output, fe = self.atmofusenet_model(x)
                 
                 seq_len=[2, 4, 8, 16, 24]
                 mae, mape, rmse = [], [], []

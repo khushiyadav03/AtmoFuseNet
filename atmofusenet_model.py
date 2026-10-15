@@ -25,7 +25,7 @@ class EncoderAttrs:
         self.rnn_units = int(model_kwargs.get('rnn_units'))
         self.latent_dim = int(model_kwargs.get('latent_dim', 4))
 
-class AirPhyNetModel(nn.Module, EncoderAttrs):
+class AtmoFuseNetModel(nn.Module, EncoderAttrs):
     def __init__(self, adj_mx, edge_index, edge_attr, logger, **model_kwargs):
         nn.Module.__init__(self)
         EncoderAttrs.__init__(self, adj_mx, **model_kwargs)

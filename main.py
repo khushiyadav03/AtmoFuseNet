@@ -3,10 +3,11 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import os
 import yaml
 
 from utils import *
-from airphynet_supervisor import AirPhyNetSupervisor
+from atmofusenet_supervisor import AtmoFuseNetSupervisor
 
 import numpy as np
 import torch
@@ -15,6 +16,8 @@ def get_mean_std(data_list):
     return data_list.mean(), data_list.std()
 
 def main(args):
+    os.makedirs('logs', exist_ok=True)
+    os.makedirs('models', exist_ok=True)
     print("Generating Adjacency Matrix")
     sensor_ids, sensor_id_to_ind, adj_mx, edge_index, edge_attr = get_adjacency_matrix(args)
     
@@ -29,7 +32,7 @@ def main(args):
             base_model = supervisor_config['base_model_dir']
             supervisor_config['base_model_dir'] = os.path.join(base_model, 'exp_'+str(exp_idx)) 
 
-            supervisor = AirPhyNetSupervisor(adj_mx=adj_mx, edge_index=edge_index, edge_attr=edge_attr, **supervisor_config)
+            supervisor = AtmoFuseNetSupervisor(adj_mx=adj_mx, edge_index=edge_index, edge_attr=edge_attr, **supervisor_config)
             supervisor.train()
             mae, mape, rmse, preds, truths = supervisor.evaluate_more('test')
 
@@ -52,7 +55,7 @@ def main(args):
     print('Mean predictions saved as {}.'.format(args.output_filename))
    
     seq_len = [2, 4, 8, 16, 24]
-    print('--------- AirPhyNet Final Results ------------' )
+    print('--------- AtmoFuseNet Final Results ------------' )
     for i, seq in enumerate(seq_len):
         print('Evaluation seq {}:'.format(seq))
         print('MAE | mean: {:.4f} std: {:.4f}'.format(get_mean_std(mae_list[:,i])[0], get_mean_std(mae_list[:,i])[1]))
@@ -60,7 +63,7 @@ def main(args):
         print('RMSE | mean: {:.4f} std: {:.4f}\n'.format(get_mean_std(rmse_list[:,i])[0], get_mean_std(rmse_list[:,i])[1]))
     
     output_text = ''
-    output_text += '--------- AirPhyNet Final Results ------------\n'
+    output_text += '--------- AtmoFuseNet Final Results ------------\n'
     for i, seq in enumerate(seq_len):
         output_text += 'Evaluation seq {}:\n'.format(seq)
         output_text += 'MAE | mean: {:.4f} std: {:.4f}\n'.format(get_mean_std(mae_list[:,i])[0], get_mean_std(mae_list[:,i])[1])
@@ -68,7 +71,7 @@ def main(args):
         output_text += 'RMSE | mean: {:.4f} std: {:.4f}\n\n'.format(get_mean_std(rmse_list[:,i])[0], get_mean_std(rmse_list[:,i])[1])
 
     # Write the output text to a file
-    with open('logs/airphynet_results.txt', 'w') as file:
+    with open('logs/atmofusenet_results.txt', 'w') as file:
         file.write(output_text)
 
     
@@ -76,7 +79,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sensor_filename', type=str, default='data/station.csv',help='Sensor Data.')
     parser.add_argument('--config_filename', default='config.yaml', type=str, help='Configuration filename for restoring the model.')
-    parser.add_argument('--output_filename', default='models/airphynet_predictions.npz')
+    parser.add_argument('--output_filename', default='models/atmofusenet_predictions.npz')
     parser.add_argument('--use_cpu_only', default=False, type=bool, help='Set to true to only use cpu.')
     parser.add_argument('--exp_repeat', type=int, default=1, help='Number of experiments.')
     args, unknown = parser.parse_known_args()
